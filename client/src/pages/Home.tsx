@@ -6,20 +6,29 @@
  * Layout: Asymmetric collage-style with color blocks and irregular edges
  */
 
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Copy, Sparkles, RefreshCw } from "lucide-react";
+import { Copy, Sparkles, RefreshCw, Wand2, FileText } from "lucide-react";
 import { useState } from "react";
 import { generateMeme, getAllKeywords } from "@/lib/memeTemplates";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 
 export default function Home() {
+  // The userAuth hooks provides authentication state
+  // To implement login/logout functionality, simply call logout() or redirect to getLoginUrl()
+  let { user, loading, error, isAuthenticated, logout } = useAuth();
+
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [mode, setMode] = useState<'template' | 'ai'>('template');
 
-  const handleGenerate = () => {
+  const aiGenerateMutation = trpc.meme.generateWithAI.useMutation();
+
+  const handleGenerate = async () => {
     if (!input.trim()) {
       toast.error("请输入关键词！");
       return;
@@ -27,23 +36,47 @@ export default function Home() {
 
     setIsGenerating(true);
     
-    // Simulate generation delay for animation effect
-    setTimeout(() => {
-      const result = generateMeme(input);
-      
-      if (result) {
-        setOutput(result);
-        toast.success("梗生成成功！", {
-          description: "快去复制分享吧 🎉"
-        });
+    try {
+      if (mode === 'template') {
+        // Use template mode
+        await new Promise(resolve => setTimeout(resolve, 600));
+        const result = generateMeme(input);
+        
+        if (result) {
+          setOutput(result);
+          toast.success("梗生成成功！", {
+            description: "快去复制分享吧 🎉"
+          });
+        } else {
+          toast.error("未找到匹配的梗模板", {
+            description: `试试这些关键词：${getAllKeywords().join("、")}`
+          });
+        }
       } else {
-        toast.error("未找到匹配的梗模板", {
-          description: `试试这些关键词：${getAllKeywords().join("、")}`
+        // Use AI mode
+        const result = await aiGenerateMutation.mutateAsync({
+          keyword: input,
         });
+        
+        if (result.success && result.text) {
+          setOutput(result.text);
+          toast.success("AI 生成成功！", {
+            description: "快去复制分享吧 🎉"
+          });
+        } else {
+          toast.error("AI 生成失败", {
+            description: "请稍后重试"
+          });
+        }
       }
-      
+    } catch (error) {
+      console.error('Generation error:', error);
+      toast.error("生成失败", {
+        description: error instanceof Error ? error.message : "请稍后重试"
+      });
+    } finally {
       setIsGenerating(false);
-    }, 600);
+    }
   };
 
   const handleCopy = async () => {
@@ -132,10 +165,44 @@ export default function Home() {
               <span className="font-accent text-sm">输入区</span>
             </div>
 
-            <div className="mt-6 space-y-4">
+            {/* Mode switcher */}
+            <div className="mt-6 mb-4 flex gap-2">
+              <Button
+                onClick={() => setMode('template')}
+                variant={mode === 'template' ? 'default' : 'outline'}
+                className={`flex-1 border-3 border-black ${
+                  mode === 'template'
+                    ? 'bg-[#FF3B3B] hover:bg-[#FF3B3B]/90 text-white'
+                    : 'bg-white hover:bg-gray-50 text-black'
+                } font-accent`}
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                预设模板
+              </Button>
+              <Button
+                onClick={() => setMode('ai')}
+                variant={mode === 'ai' ? 'default' : 'outline'}
+                className={`flex-1 border-3 border-black ${
+                  mode === 'ai'
+                    ? 'bg-[#FF3B3B] hover:bg-[#FF3B3B]/90 text-white'
+                    : 'bg-white hover:bg-gray-50 text-black'
+                } font-accent`}
+              >
+                <Wand2 className="w-4 h-4 mr-2" />
+                AI 生成
+              </Button>
+            </div>
+
+            <div className="space-y-4">
               <label className="block font-display text-xl md:text-2xl text-black">
-                输入关键词
+                {mode === 'template' ? '输入关键词' : 'AI 创作关键词'}
               </label>
+              
+              {mode === 'ai' && (
+                <p className="text-sm text-black/70 font-medium">
+                  💡 AI 模式可以根据任意关键词创作全新的梗文本
+                </p>
+              )}
               
               <Textarea
                 value={input}
