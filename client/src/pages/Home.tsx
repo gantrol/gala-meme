@@ -10,7 +10,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Copy, Sparkles, RefreshCw, Wand2, FileText } from "lucide-react";
+import { Copy, Sparkles, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { generateMeme, getAllKeywords } from "@/lib/memeTemplates";
 import { toast } from "sonner";
@@ -24,9 +24,11 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [mode, setMode] = useState<'template' | 'ai'>('template');
 
   const aiGenerateMutation = trpc.meme.generateWithAI.useMutation();
+
+  // Maximum keyword length
+  const MAX_KEYWORD_LENGTH = 6;
 
   const handleGenerate = async () => {
     if (!input.trim()) {
@@ -37,50 +39,32 @@ export default function Home() {
     setIsGenerating(true);
     
     try {
-      if (mode === 'template') {
-        // Use template mode - try template first, fallback to AI
-        await new Promise(resolve => setTimeout(resolve, 600));
-        const result = generateMeme(input);
-        
-        if (result) {
-          setOutput(result);
-          toast.success("模板生成成功！", {
-            description: "快去复制分享吧 🎉"
-          });
-        } else {
-          // Fallback to AI generation
-          toast.info("未找到预设模板，使用 AI 生成...", {
-            description: "正在为您创作全新梗文本"
-          });
-          
-          const aiResult = await aiGenerateMutation.mutateAsync({
-            keyword: input,
-          });
-          
-          if (aiResult.success && aiResult.text) {
-            setOutput(aiResult.text);
-            toast.success("AI 创作成功！", {
-              description: "快去复制分享吧 🎉"
-            });
-          } else {
-            toast.error("生成失败", {
-              description: "请稍后重试"
-            });
-          }
-        }
+      // Smart mode: try template first, fallback to AI
+      await new Promise(resolve => setTimeout(resolve, 600));
+      const result = generateMeme(input);
+      
+      if (result) {
+        setOutput(result);
+        toast.success("梗生成成功！", {
+          description: "快去复制分享吧 🎉"
+        });
       } else {
-        // Use AI mode
-        const result = await aiGenerateMutation.mutateAsync({
+        // Fallback to AI generation
+        toast.info("使用 AI 创作中...", {
+          description: "正在为您生成全新梗文本"
+        });
+        
+        const aiResult = await aiGenerateMutation.mutateAsync({
           keyword: input,
         });
         
-        if (result.success && result.text) {
-          setOutput(result.text);
-          toast.success("AI 生成成功！", {
+        if (aiResult.success && aiResult.text) {
+          setOutput(aiResult.text);
+          toast.success("生成成功！", {
             description: "快去复制分享吧 🎉"
           });
         } else {
-          toast.error("AI 生成失败", {
+          toast.error("生成失败", {
             description: "请稍后重试"
           });
         }
@@ -181,53 +165,24 @@ export default function Home() {
               <span className="font-accent text-sm">输入区</span>
             </div>
 
-            {/* Mode switcher */}
-            <div className="mt-6 mb-4 flex gap-2">
-              <Button
-                onClick={() => setMode('template')}
-                variant={mode === 'template' ? 'default' : 'outline'}
-                className={`flex-1 border-3 border-black ${
-                  mode === 'template'
-                    ? 'bg-[#FF3B3B] hover:bg-[#FF3B3B]/90 text-white'
-                    : 'bg-white hover:bg-gray-50 text-black'
-                } font-accent`}
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                预设模板
-              </Button>
-              <Button
-                onClick={() => setMode('ai')}
-                variant={mode === 'ai' ? 'default' : 'outline'}
-                className={`flex-1 border-3 border-black ${
-                  mode === 'ai'
-                    ? 'bg-[#FF3B3B] hover:bg-[#FF3B3B]/90 text-white'
-                    : 'bg-white hover:bg-gray-50 text-black'
-                } font-accent`}
-              >
-                <Wand2 className="w-4 h-4 mr-2" />
-                AI 生成
-              </Button>
-            </div>
-
-            <div className="space-y-4">
+            <div className="mt-6 space-y-4">
               <label className="block font-display text-xl md:text-2xl text-black">
                 输入关键词
               </label>
               
-              {mode === 'template' ? (
-                <p className="text-sm text-black/70 font-medium">
-                  🎯 优先使用预设模板，未匹配时自动使用 AI 生成
-                </p>
-              ) : (
-                <p className="text-sm text-black/70 font-medium">
-                  💡 AI 模式直接根据关键词创作全新的梗文本
-                </p>
-              )}
-              
               <Textarea
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="输入任意关键词，如「旮屻给木」「套壳网站」「内卷」等..."
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value.length <= MAX_KEYWORD_LENGTH) {
+                    setInput(value);
+                  } else {
+                    toast.error("关键词过长！", {
+                      description: `最多输入 ${MAX_KEYWORD_LENGTH} 个字符`
+                    });
+                  }
+                }}
+                placeholder="输入关键词（最多6个字），如「旮屻给木」「套壳网站」..."
                 className="min-h-[120px] text-lg border-4 border-black bg-white resize-none font-medium focus-visible:ring-[#FF3B3B] focus-visible:ring-4"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -327,7 +282,7 @@ export default function Home() {
           </div>
 
           <p className="mt-6 text-black/60 font-medium text-sm md:text-base">
-            💡 提示：点击上方关键词快速填充，或者输入任意关键词（如内卷、摆烂、yyds），系统会自动生成！
+            💡 提示：点击上方关键词快速填充，或输入任意关键词（最多6个字），系统会智能生成！
           </p>
         </Card>
 
