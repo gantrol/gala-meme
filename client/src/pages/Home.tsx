@@ -38,19 +38,35 @@ export default function Home() {
     
     try {
       if (mode === 'template') {
-        // Use template mode
+        // Use template mode - try template first, fallback to AI
         await new Promise(resolve => setTimeout(resolve, 600));
         const result = generateMeme(input);
         
         if (result) {
           setOutput(result);
-          toast.success("梗生成成功！", {
+          toast.success("模板生成成功！", {
             description: "快去复制分享吧 🎉"
           });
         } else {
-          toast.error("未找到匹配的梗模板", {
-            description: `试试这些关键词：${getAllKeywords().join("、")}`
+          // Fallback to AI generation
+          toast.info("未找到预设模板，使用 AI 生成...", {
+            description: "正在为您创作全新梗文本"
           });
+          
+          const aiResult = await aiGenerateMutation.mutateAsync({
+            keyword: input,
+          });
+          
+          if (aiResult.success && aiResult.text) {
+            setOutput(aiResult.text);
+            toast.success("AI 创作成功！", {
+              description: "快去复制分享吧 🎉"
+            });
+          } else {
+            toast.error("生成失败", {
+              description: "请稍后重试"
+            });
+          }
         }
       } else {
         // Use AI mode
@@ -195,19 +211,23 @@ export default function Home() {
 
             <div className="space-y-4">
               <label className="block font-display text-xl md:text-2xl text-black">
-                {mode === 'template' ? '输入关键词' : 'AI 创作关键词'}
+                输入关键词
               </label>
               
-              {mode === 'ai' && (
+              {mode === 'template' ? (
                 <p className="text-sm text-black/70 font-medium">
-                  💡 AI 模式可以根据任意关键词创作全新的梗文本
+                  🎯 优先使用预设模板，未匹配时自动使用 AI 生成
+                </p>
+              ) : (
+                <p className="text-sm text-black/70 font-medium">
+                  💡 AI 模式直接根据关键词创作全新的梗文本
                 </p>
               )}
               
               <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="试试输入「旮旯给木」或「套壳网站」..."
+                placeholder="输入任意关键词，如「旮屻给木」「套壳网站」「内卷」等..."
                 className="min-h-[120px] text-lg border-4 border-black bg-white resize-none font-medium focus-visible:ring-[#FF3B3B] focus-visible:ring-4"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -307,7 +327,7 @@ export default function Home() {
           </div>
 
           <p className="mt-6 text-black/60 font-medium text-sm md:text-base">
-            💡 提示：点击上方关键词快速填充，或者直接输入任意关键词试试运气！
+            💡 提示：点击上方关键词快速填充，或者输入任意关键词（如内卷、摆烂、yyds），系统会自动生成！
           </p>
         </Card>
 
