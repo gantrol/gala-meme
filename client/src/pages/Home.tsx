@@ -31,8 +31,17 @@ export default function Home() {
   const MAX_KEYWORD_LENGTH = 6;
 
   const handleGenerate = async () => {
-    if (!input.trim()) {
+    const trimmedInput = input.trim();
+    
+    if (!trimmedInput) {
       toast.error("请输入关键词！");
+      return;
+    }
+
+    if (trimmedInput.length > MAX_KEYWORD_LENGTH) {
+      toast.error("关键词过长！", {
+        description: `最多输入 ${MAX_KEYWORD_LENGTH} 个字符，当前 ${trimmedInput.length} 个字符`
+      });
       return;
     }
 
@@ -172,16 +181,7 @@ export default function Home() {
               
               <Textarea
                 value={input}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value.length <= MAX_KEYWORD_LENGTH) {
-                    setInput(value);
-                  } else {
-                    toast.error("关键词过长！", {
-                      description: `最多输入 ${MAX_KEYWORD_LENGTH} 个字符`
-                    });
-                  }
-                }}
+                onChange={(e) => setInput(e.target.value)}
                 placeholder="输入关键词（最多6个字），如「旮屻给木」「套壳网站」..."
                 className="min-h-[120px] text-lg border-4 border-black bg-white resize-none font-medium focus-visible:ring-[#FF3B3B] focus-visible:ring-4"
                 onKeyDown={(e) => {
