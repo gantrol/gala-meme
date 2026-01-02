@@ -151,9 +151,9 @@ export default function Home() {
               <span className="text-[#FF3B3B]">梗生成器</span>
             </h1>
             
-            <p className="text-lg md:text-xl font-medium text-black/80 max-w-xl animate-bounce-in" style={{ animationDelay: '0.2s' }}>
+            <h2 className="text-lg md:text-xl font-medium text-black/80 max-w-xl animate-bounce-in" style={{ animationDelay: '0.2s' }}>
               输入关键词，一键生成爆笑梗文本！支持「旮旯给木」「套壳网站」等热门梗模板 🎨✨
-            </p>
+            </h2>
           </div>
 
           <div className="w-48 h-48 md:w-64 md:h-64 flex-shrink-0 animate-bounce-in" style={{ animationDelay: '0.3s' }}>
