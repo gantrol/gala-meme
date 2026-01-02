@@ -3,6 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { generateMemeWithAI } from "./_core/zhipuAI";
+import { containsSensitiveWord, filterSensitiveWords } from "./_core/sensitiveFilter";
 import { z } from "zod";
 
 export const appRouter = router({
@@ -30,13 +31,25 @@ export const appRouter = router({
       )
       .mutation(async ({ input }) => {
         try {
+          // 检查输入关键词是否包含敏感词
+          if (containsSensitiveWord(input.keyword)) {
+            throw new Error('输入内容包含敏感词，请修改后重试');
+          }
+          
           const memeText = await generateMemeWithAI(input.keyword, input.style);
+          
+          // 过滤 AI 生成结果中的敏感词
+          const filteredText = filterSensitiveWords(memeText);
+          
           return {
             success: true,
-            text: memeText,
+            text: filteredText,
           };
         } catch (error) {
           console.error('[Meme Generation] Error:', error);
+          if (error instanceof Error && error.message.includes('敏感词')) {
+            throw error;
+          }
           throw new Error('AI 生成失败，请稍后重试');
         }
       }),

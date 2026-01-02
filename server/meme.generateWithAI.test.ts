@@ -2,10 +2,17 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 import * as zhipuAI from "./_core/zhipuAI";
+import * as sensitiveFilter from "./_core/sensitiveFilter";
 
 // Mock the Zhipu AI module
 vi.mock("./_core/zhipuAI", () => ({
   generateMemeWithAI: vi.fn(),
+}));
+
+// Mock the sensitive filter module
+vi.mock("./_core/sensitiveFilter", () => ({
+  containsSensitiveWord: vi.fn().mockReturnValue(false),
+  filterSensitiveWords: vi.fn((text: string) => text),
 }));
 
 function createTestContext(): { ctx: TrpcContext } {
@@ -91,6 +98,7 @@ describe("meme.generateWithAI", () => {
     const { ctx } = createTestContext();
     const caller = appRouter.createCaller(ctx);
 
+    vi.mocked(sensitiveFilter.containsSensitiveWord).mockReturnValue(false);
     vi.mocked(zhipuAI.generateMemeWithAI).mockRejectedValue(
       new Error("API rate limit exceeded")
     );
@@ -100,5 +108,38 @@ describe("meme.generateWithAI", () => {
         keyword: "测试",
       })
     ).rejects.toThrow("AI 生成失败，请稍后重试");
+  });
+
+  it("should reject input containing sensitive words", async () => {
+    const { ctx } = createTestContext();
+    const caller = appRouter.createCaller(ctx);
+
+    vi.mocked(sensitiveFilter.containsSensitiveWord).mockReturnValue(true);
+
+    await expect(
+      caller.meme.generateWithAI({
+        keyword: "敏感词测试",
+      })
+    ).rejects.toThrow("输入内容包含敏感词，请修改后重试");
+  });
+
+  it("should filter sensitive words from AI generated text", async () => {
+    const { ctx } = createTestContext();
+    const caller = appRouter.createCaller(ctx);
+
+    const mockMemeText = "你为啥直接这样啊🫢🧐测试梗里不是这样😡❌️";
+    const filteredText = "你为啥直接这样啊🫢🧐***梗里不是这样😡❌️";
+
+    vi.mocked(sensitiveFilter.containsSensitiveWord).mockReturnValue(false);
+    vi.mocked(zhipuAI.generateMemeWithAI).mockResolvedValue(mockMemeText);
+    vi.mocked(sensitiveFilter.filterSensitiveWords).mockReturnValue(filteredText);
+
+    const result = await caller.meme.generateWithAI({
+      keyword: "测试",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.text).toBe(filteredText);
+    expect(sensitiveFilter.filterSensitiveWords).toHaveBeenCalledWith(mockMemeText);
   });
 });
