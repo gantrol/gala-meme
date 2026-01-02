@@ -8,4 +8,5 @@ export const ENV = {
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   zAiApiKey: process.env.Z_AI_API_KEY ?? "",
+  kimiApiKey: process.env.KIMI_API_KEY ?? "",
 };

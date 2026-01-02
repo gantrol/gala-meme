@@ -10,7 +10,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Copy, Sparkles, RefreshCw } from "lucide-react";
+import { Copy, Sparkles, RefreshCw, Cpu, Database, Zap } from "lucide-react";
 import { useState } from "react";
 import { generateMeme, getAllKeywords } from "@/lib/memeTemplates";
 import { toast } from "sonner";
@@ -24,8 +24,10 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [usedModel, setUsedModel] = useState<string | null>(null);
+  const [cacheHit, setCacheHit] = useState<boolean | null>(null);
 
-  const aiGenerateMutation = trpc.meme.generateWithAI.useMutation();
+  const generateMutation = trpc.meme.generate.useMutation();
 
   // Maximum keyword length
   const MAX_KEYWORD_LENGTH = 6;
@@ -46,37 +48,30 @@ export default function Home() {
     }
 
     setIsGenerating(true);
+    setUsedModel(null);
+    setCacheHit(null);
     
     try {
-      // Smart mode: try template first, fallback to AI
-      await new Promise(resolve => setTimeout(resolve, 600));
-      const result = generateMeme(input);
+      // Use the new generate API with multi-model support
+      const result = await generateMutation.mutateAsync({
+        keyword: trimmedInput,
+      });
       
-      if (result) {
-        setOutput(result);
-        toast.success("梗生成成功！", {
-          description: "快去复制分享吧 🎉"
+      if (result.success && result.text) {
+        setOutput(result.text);
+        setUsedModel(result.modelDisplayName || result.model || null);
+        setCacheHit(result.cacheHit || false);
+        
+        const cacheInfo = result.cacheHit ? '（缓存命中）' : '';
+        const modelInfo = result.modelDisplayName || result.model || '未知';
+        
+        toast.success("生成成功！", {
+          description: `使用模型：${modelInfo} ${cacheInfo}`
         });
       } else {
-        // Fallback to AI generation
-        toast.info("使用 AI 创作中...", {
-          description: "正在为您生成全新梗文本"
+        toast.error("生成失败", {
+          description: "请稍后重试"
         });
-        
-        const aiResult = await aiGenerateMutation.mutateAsync({
-          keyword: input,
-        });
-        
-        if (aiResult.success && aiResult.text) {
-          setOutput(aiResult.text);
-          toast.success("生成成功！", {
-            description: "快去复制分享吧 🎉"
-          });
-        } else {
-          toast.error("生成失败", {
-            description: "请稍后重试"
-          });
-        }
       }
     } catch (error) {
       console.error('Generation error:', error);
@@ -109,6 +104,8 @@ export default function Home() {
   const handleReset = () => {
     setInput("");
     setOutput("");
+    setUsedModel(null);
+    setCacheHit(null);
     toast.info("已重置");
   };
 
@@ -230,9 +227,32 @@ export default function Home() {
             </div>
 
             <div className="mt-6 space-y-4">
-              <label className="block font-display text-xl md:text-2xl text-white">
-                生成结果
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block font-display text-xl md:text-2xl text-white">
+                  生成结果
+                </label>
+                
+                {/* Model info badge */}
+                {usedModel && (
+                  <div className="flex items-center gap-2">
+                    {cacheHit ? (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-[#3BFF7A] text-black text-xs font-bold rounded-full border-2 border-black">
+                        <Database className="w-3 h-3" />
+                        缓存
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-[#FFD700] text-black text-xs font-bold rounded-full border-2 border-black">
+                        <Zap className="w-3 h-3" />
+                        新生成
+                      </span>
+                    )}
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-white text-black text-xs font-bold rounded-full border-2 border-black">
+                      <Cpu className="w-3 h-3" />
+                      {usedModel}
+                    </span>
+                  </div>
+                )}
+              </div>
 
               <div className="min-h-[120px] p-4 bg-white border-4 border-black text-black text-base md:text-lg leading-relaxed whitespace-pre-wrap font-medium">
                 {output || (
@@ -282,8 +302,15 @@ export default function Home() {
           </div>
 
           <p className="mt-6 text-black/60 font-medium text-sm md:text-base">
-            💡 提示：点击上方关键词快速填充，或输入任意关键词（最多6个字），系统会智能生成！
+            💡 提示：点击上方关键词快速填充，或输入任意关键词（最多6个字），系统会智能选择最优模型生成！
           </p>
+          
+          {/* Model info */}
+          <div className="mt-4 pt-4 border-t-2 border-black/10">
+            <p className="text-black/50 text-xs md:text-sm">
+              🤖 支持模型：GLM-4.7（高质量）· GLM-4-Air（快速）· Kimi K2（创意）
+            </p>
+          </div>
         </Card>
 
         {/* Footer with pattern */}
