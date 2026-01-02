@@ -95,34 +95,43 @@ export function getQueueStatus(): Record<string, { queueLength: number; currentC
 }
 
 /**
- * 选择最优模型（基于当前负载）
+ * 选择模型（随机 1/3 概率）
  */
 export function selectBestModel(): string {
-  // 优先级：glm-4-air > kimi-k2 > glm-4.7（基于并发能力）
-  const models = ['glm-4-air', 'kimi-k2', 'glm-4.7'];
+  const models = ['glm-4.7', 'glm-4-air', 'kimi-k2'];
   
-  for (const model of models) {
+  // 随机打乱数组顺序，确保每个模型有 1/3 的概率被优先选择
+  const shuffled = [...models].sort(() => Math.random() - 0.5);
+  
+  // 从打乱后的数组中选择第一个可用的模型
+  for (const model of shuffled) {
     const config = MODEL_CONFIGS[model];
     cleanupTimestamps(model);
     
     // 检查并发数和 RPM 是否允许
     if (currentConcurrency[model] < config.maxConcurrency && canMakeRequest(model)) {
+      console.log(`[QueueManager] 随机选择模型: ${model}`);
       return model;
     }
   }
   
-  // 如果所有模型都满了，返回队列最短的模型
-  let shortestQueue = models[0];
-  let shortestLength = queues[models[0]].length;
+  // 如果所有模型都满了，随机选择一个队列最短的模型
+  let shortestModels = [shuffled[0]];
+  let shortestLength = queues[shuffled[0]].length;
   
-  for (const model of models) {
+  for (const model of shuffled.slice(1)) {
     if (queues[model].length < shortestLength) {
       shortestLength = queues[model].length;
-      shortestQueue = model;
+      shortestModels = [model];
+    } else if (queues[model].length === shortestLength) {
+      shortestModels.push(model);
     }
   }
   
-  return shortestQueue;
+  // 如果有多个队列长度相同的模型，随机选择一个
+  const selected = shortestModels[Math.floor(Math.random() * shortestModels.length)];
+  console.log(`[QueueManager] 所有模型忙碌，随机选择队列最短的: ${selected}`);
+  return selected;
 }
 
 /**

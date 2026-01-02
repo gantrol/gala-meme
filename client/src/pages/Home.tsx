@@ -29,8 +29,27 @@ export default function Home() {
 
   const generateMutation = trpc.meme.generate.useMutation();
 
-  // Maximum keyword length
-  const MAX_KEYWORD_LENGTH = 6;
+  // Maximum keyword length: 6 for Chinese, 12 for English
+  const MAX_CHINESE_LENGTH = 6;
+  const MAX_ENGLISH_LENGTH = 12;
+
+  // Check if text is primarily Chinese
+  const isPrimarilyChinese = (text: string): boolean => {
+    const chineseChars = text.match(/[\u4e00-\u9fa5]/g) || [];
+    return chineseChars.length > text.length / 2;
+  };
+
+  // Get effective character count (Chinese counts as 1, English counts as 0.5)
+  const getEffectiveLength = (text: string): { count: number; maxAllowed: number; isChinese: boolean } => {
+    const isChinese = isPrimarilyChinese(text);
+    if (isChinese) {
+      // For Chinese text, count actual characters
+      return { count: text.length, maxAllowed: MAX_CHINESE_LENGTH, isChinese: true };
+    } else {
+      // For English text, allow up to 12 characters
+      return { count: text.length, maxAllowed: MAX_ENGLISH_LENGTH, isChinese: false };
+    }
+  };
 
   const handleGenerate = async () => {
     const trimmedInput = input.trim();
@@ -40,9 +59,11 @@ export default function Home() {
       return;
     }
 
-    if (trimmedInput.length > MAX_KEYWORD_LENGTH) {
+    const { count, maxAllowed, isChinese } = getEffectiveLength(trimmedInput);
+    if (count > maxAllowed) {
+      const typeDesc = isChinese ? '中文' : '英文';
       toast.error("关键词过长！", {
-        description: `最多输入 ${MAX_KEYWORD_LENGTH} 个字符，当前 ${trimmedInput.length} 个字符`
+        description: `${typeDesc}最多输入 ${maxAllowed} 个字符，当前 ${count} 个字符`
       });
       return;
     }
@@ -179,7 +200,7 @@ export default function Home() {
               <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="输入关键词（最多6个字），如「旮屻给木」「套壳网站」..."
+                placeholder="输入关键词（中文最多6字/英文最多12字符），如「旮屻给木」「套壳网站」..."
                 className="min-h-[120px] text-lg border-4 border-black bg-white resize-none font-medium focus-visible:ring-[#FF3B3B] focus-visible:ring-4"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
