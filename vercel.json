@@ -1,0 +1,17 @@
+{
+    "installCommand": "npm i -g pnpm && pnpm install",
+    "buildCommand": "pnpm build",
+    "outputDirectory": "dist/client",
+    "framework": null,
+    "rewrites": [
+        {
+            "source": "/api/(.*)",
+            "destination": "/api"
+        }
+    ],
+    "functions": {
+        "api/index.ts": {
+            "runtime": "@vercel/node@3.0.0"
+        }
+    }
+}
